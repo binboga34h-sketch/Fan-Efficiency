@@ -1,89 +1,70 @@
-<!DOCTYPE html>
-<html lang="tr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Fan Verimi Hesaplayıcı</title>
-    <style>
-        body { font-family: Arial, sans-serif; background-color: #0f172a; color: white; text-align: center; padding: 20px; }
-        h1 { color: #38bdf8; }
-        input { padding: 8px; margin: 5px; border-radius: 5px; border: none; width: 200px; }
-        button { padding: 10px 20px; background: #22c55e; color: white; border: none; border-radius: 5px; cursor: pointer; }
-        button:hover { background: #16a34a; }
-        .output { background: #1e293b; padding: 10px; border-radius: 10px; margin-top: 15px; }
-        .formula { font-size: 0.9em; color: #94a3b8; text-align: left; display: inline-block; }
-    </style>
-</head>
-<body>
+<!-- Kanal Tipi Seçimi -->
+<div class="field">
+  <label for="kanalTipi">Kanal Tipi</label>
+  <select id="kanalTipi" onchange="updateKanalInputs()">
+    <option value="daire">Daire</option>
+    <option value="dikdortgen">Dikdörtgen</option>
+  </select>
+</div>
 
-<h1>Fan Verimi Hesaplayıcı</h1>
-<p>Sıcaklığa göre yoğunluk otomatik: Birimler → ΔP: Pa, Q: m³/h, Pₑ: kW</p>
+<!-- Daire için çap -->
+<div class="field kanal-input" id="daireInputs">
+  <label for="cap">Çap (m)</label>
+  <input type="number" id="cap" step="0.01" placeholder="Örn: 0.5">
+</div>
 
-<input type="number" id="temp" placeholder="Sıcaklık (°C)">
-<input type="number" id="dp" placeholder="Basınç Farkı ΔP (Pa)">
-<br>
-<input type="number" id="flow" placeholder="Hacimsel Debi Q (m³/h)">
-<input type="number" id="vel" placeholder="Hız (m/s)">
-<input type="number" id="diam" placeholder="Çap (m)">
-<br>
-<input type="number" id="power" placeholder="Elektriksel Güç Pₑ (kW)">
-<br>
-<button onclick="calculate()">HESAPLA</button>
+<!-- Dikdörtgen için genişlik ve yükseklik -->
+<div class="field kanal-input" id="dikdortgenInputs" style="display:none;">
+  <label for="genislik">Genişlik (m)</label>
+  <input type="number" id="genislik" step="0.01" placeholder="Örn: 0.6">
+  <label for="yukseklik">Yükseklik (m)</label>
+  <input type="number" id="yukseklik" step="0.01" placeholder="Örn: 0.4">
+</div>
 
-<div class="output" id="result"></div>
-
-<div class="formula">
-    <p><b>Formüller:</b></p>
-    <ul>
-        <li>Yoğunluk: ρ = p / (R·T) &nbsp;&nbsp; (p=101325 Pa, R=287.05 J/kg·K, T=°C+273.15)</li>
-        <li>Q (m³/s) = Q (m³/h) / 3600</li>
-        <li>Pₕ = Q · ΔP (W)</li>
-        <li>η = Pₕ / (Pₑ·1000)</li>
-        <li>Alan = π·(d/2)²</li>
-        <li>Q (m³/h) = Hız·Alan·3600</li>
-    </ul>
+<!-- Hız -->
+<div class="field">
+  <label for="kanalHizi">Hız (m/s)</label>
+  <input type="number" id="kanalHizi" step="0.01" placeholder="Örn: 5">
 </div>
 
 <script>
-function calculate() {
-    let T = parseFloat(document.getElementById("temp").value);
-    let dp = parseFloat(document.getElementById("dp").value);
-    let Q = parseFloat(document.getElementById("flow").value);
-    let vel = parseFloat(document.getElementById("vel").value);
-    let diam = parseFloat(document.getElementById("diam").value);
-    let Pe = parseFloat(document.getElementById("power").value);
+function updateKanalInputs() {
+  let tip = document.getElementById("kanalTipi").value;
+  document.getElementById("daireInputs").style.display = tip === "daire" ? "block" : "none";
+  document.getElementById("dikdortgenInputs").style.display = tip === "dikdortgen" ? "block" : "none";
+}
 
-    // Eğer hız ve çap girilmişse Q'yu otomatik hesapla
-    if (!isNaN(vel) && !isNaN(diam)) {
-        let alan = Math.PI * Math.pow(diam / 2, 2);
-        Q = vel * alan * 3600; // m³/h
-        document.getElementById("flow").value = Q.toFixed(2);
+function hesaplaDebiFromHiz() {
+  let tip = document.getElementById("kanalTipi").value;
+  let hiz = parseFloat(document.getElementById("kanalHizi").value);
+  let alan = 0;
+
+  if (tip === "daire") {
+    let cap = parseFloat(document.getElementById("cap").value);
+    if (!isNaN(cap)) {
+      alan = Math.PI * Math.pow(cap / 2, 2);
     }
+  } else {
+    let genislik = parseFloat(document.getElementById("genislik").value);
+    let yukseklik = parseFloat(document.getElementById("yukseklik").value);
+    if (!isNaN(genislik) && !isNaN(yukseklik)) {
+      alan = genislik * yukseklik;
+    }
+  }
 
-    // Yoğunluk hesaplama
-    let p = 101325;
-    let R = 287.05;
-    let rho = p / (R * (T + 273.15));
+  if (!isNaN(hiz) && alan > 0) {
+    let debi_m3s = hiz * alan;
+    let debi_m3h = debi_m3s * 3600;
+    document.getElementById("q").value = debi_m3h.toFixed(2); // Mevcut Debi alanına yaz
+  }
+}
 
-    // Debiyi m³/s çevir
-    let Qms = Q / 3600;
-
-    // Kütlesel debi
-    let m_dot = rho * Qms;
-
-    // Hidrolik güç (W)
-    let Ph = Qms * dp;
-
-    // Verim
-    let eta = (Ph / (Pe * 1000)) * 100;
-
-    document.getElementById("result").innerHTML = `
-        ρ (Yoğunluk): <b>${rho.toFixed(4)}</b> kg/m³<br>
-        Q: <b>${Qms.toFixed(2)}</b> m³/s (girdi: ${Q.toFixed(2)} m³/h)<br>
-        ṁ (Kütlesel debi): <b>${m_dot.toFixed(4)}</b> kg/s<br>
-        Pₕ (Hidrolik güç): <b>${(Ph / 1000).toFixed(3)}</b> kW<br>
-        η (Fan verimi): <b>${eta.toFixed(2)}</b> %
-    `;
+// Alan değişince otomatik hesaplama
+document.getElementById("kanalTipi").addEventListener("change", hesaplaDebiFromHiz);
+document.getElementById("cap").addEventListener("input", hesaplaDebiFromHiz);
+document.getElementById("genislik").addEventListener("input", hesaplaDebiFromHiz);
+document.getElementById("yukseklik").addEventListener("input", hesaplaDebiFromHiz);
+document.getElementById("kanalHizi").addEventListener("input", hesaplaDebiFromHiz);
 }
 </script>
 
